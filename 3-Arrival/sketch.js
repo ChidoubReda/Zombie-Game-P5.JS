@@ -2,6 +2,8 @@ let nbVehicules = 20;
 let target;
 let vehicle;
 let vehicles = [];
+let snakes = [];
+
 // Texte
 let font;
 let points = [];
@@ -25,6 +27,9 @@ function setup() {
 
   // Texte qu'on affiche avec textToPoint
   // Get the point array.
+  // parameters are : text, x, y, fontSize, options. 
+  // sampleFactor : 0.01 = gros points, 0.1 = petits points
+  // ca représente la densité des points
   points = font.textToPoints('Hello!', 350, 250, 305, { sampleFactor: 0.03 });
 
   // on cree des vehicules, autant que de points
@@ -33,6 +38,7 @@ function setup() {
     let v = new Vehicle(random(width), random(height));
     vehicles.push(v);
   }
+
 
 }
 
@@ -51,6 +57,62 @@ function draw() {
     circle(pt.x, pt.y, 15);
     pop();
   });
+
+
+
+  // On affiche les snakes, qui suivent la souris
+  // Calcul de positions derrière la souris, comme si on faisait 
+  // une "formation d'avions" derrière la souris. Par exemple
+  // formation en V avec un certain espacement. On va définir 7 cibles
+  // derrière la souris, la souris étant la tête de la formation
+  // la cible 0 est 30 pixels derrière la souris, les cibles 1 et 2 sont derrière et à gauche et à droite
+  // par rapport à la direction du mouvement de la souris, etc.
+  // les cibles sont DERRIERE la souris quand elle se déplace
+  // Lorsque la souris est immobile (previousMouseX == mouseX et previousMouseY == mouseY avec une certaine
+  // tolérance), les cibles restent à leur position précédente
+  let formationTargets = [];
+  let numFormationTargets = 7;
+  let spacing = 30;
+
+  // Calcul de la direction du mouvement de la souris
+  let mouseVel = createVector(mouseX - pmouseX, mouseY - pmouseY);
+  if (mouseVel.mag() < 0.1) {
+    mouseVel.set(0, -1); // si la souris est immobile, on considère qu'elle regarde vers le haut
+  } else {
+    mouseVel.normalize();
+  }
+
+  // Vecteur perpendiculaire à la direction du mouvement de la souris
+  let perp = createVector(-mouseVel.y, mouseVel.x);
+
+  for (let i = 0; i < numFormationTargets; i++) {
+    let targetPos = createVector(mouseX, mouseY);
+    targetPos.sub(p5.Vector.mult(mouseVel, spacing * (floor(i / 2) + 1))); // derrière la souris
+    if (i % 2 == 1) {
+      targetPos.add(p5.Vector.mult(perp, spacing * (floor(i / 2) + 1))); // à gauche  
+    } else if (i % 2 == 0 && i != 0) {
+      targetPos.sub(p5.Vector.mult(perp, spacing * (floor(i / 2)))); // à droite
+    }
+    formationTargets.push(targetPos);
+  }
+
+  // Dessin sous forme de cercles de rayon 10 des formationTargets
+  if (Vehicle.debug) {
+    formationTargets.forEach(target => {
+      push();
+      fill("grey");
+      noStroke();
+      circle(target.x, target.y, 15);
+      pop();
+    });
+  }
+
+  snakes.forEach((snake, index) => {
+    let cible = formationTargets[index % formationTargets.length];
+    snake.update(cible);
+    snake.show();
+  });
+
 
   switch (mode) {
     case "snake":
@@ -110,5 +172,17 @@ function keyPressed() {
   } else if (key === 't') {
     // Mode = Text
     mode = "text";
+  } else if (key === 'a') {
+    // on va créer une instance de la classe Snake
+    // qui va gérer elle-même son tableau de véhicules
+    // et son comportement de snake
+    // TODO
+    // couleur random
+    let couleur = color(random(255), random(255), random(255));
+    // taille random entre 10 et 50
+    let taille = random(10, 50);
+    // longueur random entre 5 et 30
+    let length = floor(random(5, 30));
+    snakes.push(new Snake(mouseX, mouseY, length, taille, couleur));
   }
 }
