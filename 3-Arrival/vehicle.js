@@ -68,6 +68,13 @@ class Vehicle {
       // qui devient inversement proportionnelle à la distance.
       // si d = rayon alors desiredSpeed = maxSpeed
       // si d = 0 alors desiredSpeed = 0
+      // map fait exactement ça: 
+      // les paramètres sont:
+      // la valeur à transformer (ici distance)
+      // la valeur min de cette valeur (ici 0)
+      // la valeur max de cette valeur (ici this.rayonZoneDeFreinage)
+      // la nouvelle valeur min (ici 0)
+      // la nouvelle valeur max (ici this.maxSpeed)
       if (distance < this.rayonZoneDeFreinage) {
         valueDesiredSpeed = map(distance, d, this.rayonZoneDeFreinage, 0, this.maxSpeed);
       }
