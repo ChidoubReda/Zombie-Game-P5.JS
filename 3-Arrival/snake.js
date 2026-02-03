@@ -157,7 +157,8 @@ class Snake extends Vehicle {
         // La tête suit la cible
         // mais il ondule, donc il y a un petit déplacement sinusoïdal
         // perpendiculaire à la direction du mouvement
-        let forceSuivi = this.head.arrive(target, 20);
+        //let forceSuivi = this.head.arrive(target, 20);
+        let forceSuivi = this.head.arrive(target, 15);
         this.head.applyForce(forceSuivi);
         this.head.update();
 

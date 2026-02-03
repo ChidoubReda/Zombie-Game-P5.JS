@@ -2,6 +2,7 @@ let nbVehicules = 20;
 let target;
 let vehicle;
 let vehicles = [];
+let vehiclesWander = [];
 let snakes = [];
 
 // Texte
@@ -135,6 +136,7 @@ function draw() {
         if (index === 0) {
           // le premier véhicule suit la souris avec arrivée
           steeringForce = vehicle.arrive(target);
+        //steeringForce = vehicle.wander();
         } else {
           // Je suis un suiveur, je poursuis le véhicule 
           // précédent avec arrivée
@@ -160,12 +162,27 @@ function draw() {
       break;
   }
 
+  // Affichage des véhicules en mode wander
+  vehiclesWander.forEach(vehicle => {
+    let force = vehicle.wander();
+    vehicle.applyForce(force);
+    vehicle.update();
+    vehicle.show();
+    vehicle.edges();
+  });
+
 }
 
 
 function keyPressed() {
   if (key === 'd') {
     Vehicle.debug = !Vehicle.debug;
+  } else if(key === 'w') {
+    // Je crée un nouveau véhicule en mode wander
+    let v = new VehicleWander(random(width), random(height));
+    v.r = 60; // plus grand
+    v.couleur = color(0, 255, 0); // vert
+    vehiclesWander.push(v);
   } else if (key === 's') {
     // Mode = Snake
     mode = "snake";

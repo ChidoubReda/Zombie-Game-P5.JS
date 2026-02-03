@@ -97,7 +97,7 @@ class Vehicle {
     // On met la force à maxForce
     force.setMag(this.maxForce);
     // on applique la force
-    this.applyForce(force);
+
 
     pop();
 
