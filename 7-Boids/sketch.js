@@ -5,6 +5,7 @@
 // Game entities
 let player;
 let zombies = [];
+let missiles = []; // Tableau pour gérer les missiles
 let obstacles = [];
 let resources = [];
 let safeZones = [];
@@ -16,6 +17,8 @@ let cameraPos;
 let gameState = "playing"; // "playing", "won", "lost"
 let safeZonesActivated = 0;
 let totalSafeZones = 3;
+let currentLevel = 1; // Niveau actuel du jeu
+let zombiesKilled = 0; // Nombre de zombies tués
 
 // World bounds (infinite scrolling world)
 let worldSize = 4000;
@@ -44,7 +47,7 @@ function setup() {
   for (let i = 0; i < 15; i++) {
     let x = random(-500, 500);
     let y = random(-500, 500);
-    zombies.push(new Zombie(x, y));
+    zombies.push(new Zombie(x, y, currentLevel)); // Avec le niveau actuel
   }
 
   // Generate resources scattered in world
@@ -77,6 +80,49 @@ function draw() {
     for (let zombie of zombies) {
       zombie.applyBehaviors(zombies, player, obstacles);
       zombie.update();
+    }
+    
+    // Supprimer les zombies morts
+    zombies = zombies.filter(z => {
+      if (z.dead) {
+        zombiesKilled++;
+        return false;
+      }
+      return true;
+    });
+    
+    // Augmenter le niveau tous les 10 zombies tués
+    if (zombiesKilled > 0 && zombiesKilled % 10 === 0) {
+      let newLevel = floor(zombiesKilled / 10) + 1;
+      if (newLevel > currentLevel) {
+        currentLevel = newLevel;
+        console.log("🎉 Niveau augmenté à", currentLevel);
+      }
+    }
+    
+    // Mettre à jour les missiles
+    for (let i = missiles.length - 1; i >= 0; i--) {
+      missiles[i].updateMissile();
+      
+      // Supprimer les missiles qui ont expiré
+      if (!missiles[i].isAlive()) {
+        missiles.splice(i, 1);
+      }
+    }
+    
+    // Vérifier les collisions missile-zombie
+    for (let i = missiles.length - 1; i >= 0; i--) {
+      let missileHit = false;
+      for (let zombie of zombies) {
+        if (!zombie.dead && missiles[i].hits(zombie)) {
+          zombie.takeDamage(1);
+          missileHit = true;
+          break;
+        }
+      }
+      if (missileHit) {
+        missiles.splice(i, 1);
+      }
     }
 
     // Check collisions: player vs zombies
@@ -119,6 +165,13 @@ function draw() {
     // Draw UI
     drawUI();
   } else {
+  
+  // Draw missiles
+  for (let missile of missiles) {
+    if (isOnScreen(missile.pos, missile.r)) {
+      missile.show();
+    }
+  }
     // Game over screen
     drawGameOver();
   }
@@ -160,6 +213,13 @@ function renderGame() {
   for (let zombie of zombies) {
     if (isOnScreen(zombie.pos, zombie.r)) {
       zombie.show();
+    }
+  }
+  
+  // Draw missiles
+  for (let missile of missiles) {
+    if (isOnScreen(missile.pos, missile.r + 50)) {
+      missile.show();
     }
   }
 
@@ -224,37 +284,45 @@ function drawUI() {
   noStroke();
   text(`Resources: ${player.resourcesCollected}`, 20, 75);
   
-  // Zombie count (top-right)
+  // Zombie count and level (top-right)
   fill(255);
   textAlign(RIGHT, TOP);
   text(`Zombies: ${zombies.length}`, width - 20, 20);
+  text(`Zombies killed: ${zombiesKilled}`, width - 20, 45);
+  
+  // Afficher le niveau actuel
+  fill(255, 200, 0);
+  textSize(20);
+  text(`Level: ${currentLevel}`, width - 20, 70);
+  textSize(16);
   
   // Time survived
   let minutes = floor(frameCount / 3600);
   let seconds = floor((frameCount % 3600) / 60);
-  text(`Time: ${minutes}:${nf(seconds, 2)}`, width - 20, 45);
+  text(`Time: ${minutes}:${nf(seconds, 2)}`, width - 20, 100);
   
   // Safe zones progress
-  text(`Safe Zones: ${safeZonesActivated}/${totalSafeZones}`, width - 20, 70);
+  text(`Safe Zones: ${safeZonesActivated}/${totalSafeZones}`, width - 20, 125);
   
   // Controls (bottom-left)
   textAlign(LEFT, BOTTOM);
   textSize(14);
   fill(255, 200);
-  let controlY = height - 100;
+  let controlY = height - 120;
   text("WASD / Arrows - Move", 20, controlY);
   text("SHIFT - Sprint", 20, controlY + 20);
+  text("CLICK - Shoot missiles", 20, controlY + 40);
   
   if (player.flashlightCooldown <= 0) {
     fill(255, 255, 0);
-    text("[SPACE] Flashlight (Ready)", 20, controlY + 40);
+    text("[SPACE] Flashlight (Ready)", 20, controlY + 60);
   } else {
     fill(255, 100);
     let cooldownSec = ceil(player.flashlightCooldown / 60);
-    text(`[SPACE] Flashlight (Cooldown: ${cooldownSec}s)`, 20, controlY + 40);
+    text(`[SPACE] Flashlight (Cooldown: ${cooldownSec}s)`, 20, controlY + 60);
   }
   
-  text("D - Debug mode", 20, controlY + 60);
+  text("D - Debug mode", 20, controlY + 80);
   
   // Mini-map (bottom-right)
   drawMiniMap();
@@ -339,7 +407,7 @@ function drawGameOver() {
     textSize(24);
     fill(255);
     text(`Resources Collected: ${player.resourcesCollected}`, width/2, height/2 + 20);
-    text(`Time: ${floor(frameCount/3600)}:${nf(floor((frameCount%3600)/60), 2)}`, width/2, height/2 + 50);
+    text(`Zombies Defeated: ${zombiesKilled}`, width/2, height/2 + 80);
   } else {
     textSize(48);
     fill(255, 50, 50);
@@ -348,6 +416,7 @@ function drawGameOver() {
     textSize(24);
     fill(255);
     text(`Resources Collected: ${player.resourcesCollected}`, width/2, height/2 + 20);
+    text(`Zombies Defeated: ${zombiesKilled}: ${player.resourcesCollected}`, width/2, height/2 + 20);
     text(`Zombies Defeated: 0`, width/2, height/2 + 50);
   }
   
@@ -377,7 +446,7 @@ function spawnZombie() {
   let spawnX = player.pos.x + cos(angle) * spawnDist;
   let spawnY = player.pos.y + sin(angle) * spawnDist;
   
-  zombies.push(new Zombie(spawnX, spawnY));
+  zombies.push(new Zombie(spawnX, spawnY, currentLevel)); // Avec le niveau actuel
 }
 
 function isOnScreen(worldPos, radius = 0) {
@@ -406,21 +475,32 @@ function keyPressed() {
   }
 }
 
+// Gestion du clic de souris pour tirer
+function mousePressed() {
+  if (gameState === "playing") {
+    let newMissiles = player.shoot(zombies);
+    missiles.push(...newMissiles);
+  }
+}
+
 function restartGame() {
   // Reset all game state
   player = new Player(0, 0);
   zombies = [];
+  missiles = [];
   resources = [];
   safeZones = [];
   gameState = "playing";
   safeZonesActivated = 0;
   lastZombieSpawn = 0;
+  currentLevel = 1;
+  zombiesKilled = 0;
   
   // Regenerate world
   for (let i = 0; i < 15; i++) {
     let x = random(-500, 500);
     let y = random(-500, 500);
-    zombies.push(new Zombie(x, y));
+    zombies.push(new Zombie(x, y, currentLevel));
   }
   
   for (let i = 0; i < 80; i++) {

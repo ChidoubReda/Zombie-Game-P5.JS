@@ -2,7 +2,7 @@
 // Hérite de Vehicle pour réutiliser les comportements de steering
 
 class Zombie extends Vehicle {
-  constructor(x, y) {
+  constructor(x, y, level = 1) {
     super(x, y);
     
     // Override vehicle properties
@@ -26,6 +26,12 @@ class Zombie extends Vehicle {
 
     // Chase mode
     this.isChasing = false;
+    
+    // Système de points de vie basé sur le niveau
+    this.level = level;
+    this.maxHealth = level; // Niveau 1 = 1 PV, Niveau 2 = 2 PV, etc.
+    this.health = this.maxHealth;
+    this.dead = false;
   }
 
   // Main behavior function - called every frame
@@ -69,6 +75,14 @@ class Zombie extends Vehicle {
       this.applyForce(avoidForce);
     }
   }
+  
+  // Méthode pour infliger des dégâts au zombie
+  takeDamage(amount = 1) {
+    this.health -= amount;
+    if (this.health <= 0) {
+      this.dead = true;
+    }
+  }
 
   // Override show method from Vehicle
   show() {
@@ -103,6 +117,29 @@ class Zombie extends Vehicle {
       stroke(255, 0, 0, 50);
       strokeWeight(3);
       circle(this.pos.x, this.pos.y, this.r * 2.5);
+    }
+    
+    // Barre de vie si le zombie a plusieurs PV
+    if (this.maxHealth > 1) {
+      let barWidth = this.r * 2;
+      let barHeight = 4;
+      let barY = this.pos.y - this.r - 10;
+      
+      // Fond de la barre
+      fill(100, 0, 0);
+      noStroke();
+      rect(this.pos.x - barWidth/2, barY, barWidth, barHeight);
+      
+      // Barre de vie
+      fill(255, 0, 0);
+      let healthWidth = (this.health / this.maxHealth) * barWidth;
+      rect(this.pos.x - barWidth/2, barY, healthWidth, barHeight);
+      
+      // Contour
+      noFill();
+      stroke(255);
+      strokeWeight(1);
+      rect(this.pos.x - barWidth/2, barY, barWidth, barHeight);
     }
 
     pop();

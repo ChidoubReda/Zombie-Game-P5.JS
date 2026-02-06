@@ -29,6 +29,11 @@ class Player extends Vehicle {
     // Invincibility frames after taking damage
     this.invincible = false;
     this.invincibilityTimer = 0;
+    
+    // Système de tir
+    this.shootCooldown = 0;
+    this.shootCooldownMax = 20; // 20 frames = ~0.33 secondes entre chaque tir
+    this.shootDistance = 25; // Distance depuis les côtés du player
   }
 
   handleInput() {
@@ -71,6 +76,55 @@ class Player extends Vehicle {
     } else {
       console.log("⏳ Flashlight on cooldown:", Math.ceil(this.flashlightCooldown / 60), "seconds");
     }
+  }
+  
+  // Méthode pour tirer des missiles
+  shoot(zombies) {
+    if (this.shootCooldown <= 0 && zombies.length > 0) {
+      let missiles = [];
+      
+      // Trouver le zombie le plus proche
+      let closestZombie = null;
+      let minDist = Infinity;
+      for (let zombie of zombies) {
+        if (!zombie.dead) {
+          let d = this.pos.dist(zombie.pos);
+          if (d < minDist) {
+            minDist = d;
+            closestZombie = zombie;
+          }
+        }
+      }
+      
+      if (closestZombie) {
+        // Calculer les positions des deux côtés du player (perpendiculaire à la direction)
+        let angle = this.vel.mag() > 0.5 ? this.vel.heading() : 0;
+        let perpAngle1 = angle + HALF_PI;
+        let perpAngle2 = angle - HALF_PI;
+        
+        // Position du missile 1 (côté gauche)
+        let missilePos1 = createVector(
+          this.pos.x + cos(perpAngle1) * this.shootDistance,
+          this.pos.y + sin(perpAngle1) * this.shootDistance
+        );
+        
+        // Position du missile 2 (côté droit)
+        let missilePos2 = createVector(
+          this.pos.x + cos(perpAngle2) * this.shootDistance,
+          this.pos.y + sin(perpAngle2) * this.shootDistance
+        );
+        
+        // Créer les deux missiles
+        missiles.push(new Missile(missilePos1.x, missilePos1.y, closestZombie));
+        missiles.push(new Missile(missilePos2.x, missilePos2.y, closestZombie));
+        
+        // Réinitialiser le cooldown
+        this.shootCooldown = this.shootCooldownMax;
+      }
+      
+      return missiles;
+    }
+    return [];
   }
 
   // Method to apply flashlight force each frame while active
@@ -125,6 +179,11 @@ class Player extends Vehicle {
     // Update cooldowns
     if (this.flashlightCooldown > 0) {
       this.flashlightCooldown--;
+    }
+    
+    // Update shoot cooldown
+    if (this.shootCooldown > 0) {
+      this.shootCooldown--;
     }
     
     // Update flashlight duration
