@@ -69,6 +69,9 @@ function draw() {
     // Update player
     player.update();
     player.checkCollisionWithObstacles(obstacles);
+    
+    // Apply flashlight force if active
+    player.applyFlashlightForce(zombies);
 
     // Update all zombies
     for (let zombie of zombies) {
@@ -387,13 +390,14 @@ function isOnScreen(worldPos, radius = 0) {
 
 function keyPressed() {
   if (key === ' ') {
+    console.log("🎮 SPACE pressed! gameState:", gameState);
     // Flashlight
     if (gameState === "playing") {
       player.useFlashlight(zombies);
     }
   } else if (key === 'd' || key === 'D') {
     // Toggle debug mode
-    Zombie.debug = !Zombie.debug;
+    Vehicle.debug = !Vehicle.debug;
   } else if (key === 'r' || key === 'R') {
     // Restart game
     if (gameState !== "playing") {

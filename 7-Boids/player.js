@@ -1,9 +1,10 @@
 // Player class - The survivor you control
-class Player {
+// Hérite de Vehicle pour les comportements de steering
+class Player extends Vehicle {
   constructor(x, y) {
-    this.pos = createVector(x, y);
-    this.vel = createVector(0, 0);
-    this.acc = createVector(0, 0);
+    super(x, y);
+    
+    // Override vehicle properties
     this.maxSpeed = 5;
     this.maxForce = 0.3;
     this.r = 16; // collision radius
@@ -18,6 +19,7 @@ class Player {
     this.flashlightRadius = 150;
     this.flashlightCooldown = 0;
     this.flashlightMaxCooldown = 600; // 10 seconds at 60fps
+    this.flashlightDuration = 0; // Frame counter for active duration
     
     // Sprint mechanic
     this.isSprinting = false;
@@ -64,22 +66,28 @@ class Player {
     if (this.flashlightCooldown <= 0 && !this.flashlightActive) {
       this.flashlightActive = true;
       this.flashlightCooldown = this.flashlightMaxCooldown;
-      
+      this.flashlightDuration = 120; // 2 seconds at 60fps
+      console.log("🔦 Flashlight activated!");
+    } else {
+      console.log("⏳ Flashlight on cooldown:", Math.ceil(this.flashlightCooldown / 60), "seconds");
+    }
+  }
+
+  // Method to apply flashlight force each frame while active
+  applyFlashlightForce(zombies) {
+    if (this.flashlightActive) {
+      console.log("⚡ Flashlight active! Applying forces to", zombies.length, "zombies");
       // Apply strong flee force to all zombies in radius
       for (let zombie of zombies) {
         let d = this.pos.dist(zombie.pos);
         if (d < this.flashlightRadius && d > 0) {
+          console.log("  💥 Pushing zombie at distance:", d.toFixed(2));
           let fleeForce = p5.Vector.sub(zombie.pos, this.pos);
           fleeForce.normalize();
           fleeForce.mult(5); // Very strong push
           zombie.applyForce(fleeForce);
         }
       }
-      
-      // Duration: 2 seconds (120 frames)
-      setTimeout(() => {
-        this.flashlightActive = false;
-      }, 2000);
     }
   }
 
@@ -107,23 +115,24 @@ class Player {
     }
   }
 
-  applyForce(force) {
-    this.acc.add(force);
-  }
-
   update() {
     // Handle input
     this.handleInput();
     
-    // Update physics
-    this.vel.add(this.acc);
-    this.vel.limit(this.maxSpeed);
-    this.pos.add(this.vel);
-    this.acc.mult(0);
+    // Update physics (inherited from Vehicle)
+    super.update();
     
     // Update cooldowns
     if (this.flashlightCooldown > 0) {
       this.flashlightCooldown--;
+    }
+    
+    // Update flashlight duration
+    if (this.flashlightDuration > 0) {
+      this.flashlightDuration--;
+      if (this.flashlightDuration <= 0) {
+        this.flashlightActive = false;
+      }
     }
     
     // Update invincibility
@@ -135,7 +144,8 @@ class Player {
     }
   }
 
-  show(cameraPos) {
+  // Override show method from Vehicle
+  show() {
     push();
     
     // Draw flashlight radius when active
