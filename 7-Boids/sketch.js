@@ -129,12 +129,39 @@ function draw() {
     for (let zombie of zombies) {
       let d = player.pos.dist(zombie.pos);
       if (d < player.r + zombie.r) {
-        player.takeDamage(0.5); // Gradual damage
+        // Le zombie est en contact avec le joueur
+        zombie.contactTime++;
         
-        // Push zombie away slightly
+        // Calculer les dégâts basés sur le temps de contact (croissance exponentielle)
+        // Plus le zombie reste collé, plus il inflige de dégâts
+        let secondsOfContact = zombie.contactTime / 60;
+        let damageMultiplier = 1 + secondsOfContact; // +100% par seconde de contact
+        
+        // Infliger des dégâts toutes les 15 frames (4 fois par seconde)
+        if (frameCount - zombie.lastDamageFrame >= 15) {
+          let damage = 0.5 * damageMultiplier; // Base de 0.5 point tous les 1/4 seconde
+          player.takeDamage(damage);
+          zombie.lastDamageFrame = frameCount;
+          
+          // Debug: afficher les dégâts
+          if (frameCount % 60 === 0) {
+            console.log(`💀 Zombie dégâts: ${damage.toFixed(2)} (x${damageMultiplier.toFixed(2)} après ${secondsOfContact.toFixed(1)}s)`);
+          }
+        }
+        
+        // Effet visuel: faire vibrer le zombie quand il attaque
+        if (frameCount % 4 === 0) {
+          zombie.pos.x += random(-1, 1);
+          zombie.pos.y += random(-1, 1);
+        }
+        
+        // Push zombie away slightly (moins fort maintenant pour qu'il reste collé)
         let push = p5.Vector.sub(zombie.pos, player.pos);
-        push.setMag(2);
+        push.setMag(0.5);
         zombie.pos.add(push);
+      } else {
+        // Réinitialiser le temps de contact si le zombie n'est plus en contact
+        zombie.contactTime = 0;
       }
     }
 
@@ -271,13 +298,13 @@ function drawUI() {
   
   // Health bar visual
   fill(100, 0, 0);
-  rect(20, 45, 200, 20);
+  rect(20, 45, 150, 16);
   fill(255, 0, 0);
-  rect(20, 45, (player.health / player.maxHealth) * 200, 20);
+  rect(20, 45, (player.health / player.maxHealth) * 150, 16);
   stroke(255);
   strokeWeight(2);
   noFill();
-  rect(20, 45, 200, 20);
+  rect(20, 45, 150, 16);
   
   // Resources collected
   fill(255, 200, 50);

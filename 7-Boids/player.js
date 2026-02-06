@@ -10,8 +10,8 @@ class Player extends Vehicle {
     this.r = 16; // collision radius
     
     // Game stats
-    this.health = 100;
-    this.maxHealth = 100;
+    this.health = 50;
+    this.maxHealth = 50;
     this.resourcesCollected = 0;
     
     // Flashlight mechanic

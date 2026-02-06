@@ -32,6 +32,11 @@ class Zombie extends Vehicle {
     this.maxHealth = level; // Niveau 1 = 1 PV, Niveau 2 = 2 PV, etc.
     this.health = this.maxHealth;
     this.dead = false;
+    
+    // Système de dégâts progressifs
+    this.contactTime = 0; // Temps de contact avec le joueur
+    this.damageRate = 1; // Dégâts de base par seconde
+    this.lastDamageFrame = 0; // Frame du dernier dégât infligé
   }
 
   // Main behavior function - called every frame
