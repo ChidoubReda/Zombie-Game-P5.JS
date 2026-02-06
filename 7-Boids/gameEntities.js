@@ -1,12 +1,17 @@
 // Resource class - Collectible items scattered in the world
 
-class Resource {
+class Resource extends Vehicle {
   constructor(x, y, type = "resource") {
-    this.pos = createVector(x, y);
+    super(x, y);
     this.r = 8;
-    this.type = type; // "resource", "medkit", "flare"
+    this.type = type; // "resource", "medkit", "flare", "ammo"
     this.collected = false;
     this.glowRadius = 20;
+    
+    // Properties for movement (ammo type only)
+    this.maxSpeed = 3;
+    this.maxForce = 0.15;
+    this.attractionRadius = 150; // Distance à laquelle l'ammo est attiré
     
     // Set properties based on type
     switch(type) {
@@ -18,9 +23,27 @@ class Resource {
         this.color = color(255, 255, 255); // White
         this.value = 1; // Flare count
         break;
+      case "ammo":
+        this.color = color(255, 100, 255); // Purple/Magenta
+        this.value = 1; // Ammo count
+        this.r = 10; // Slightly larger
+        break;
       default: // "resource"
         this.color = color(255, 200, 50); // Gold
         this.value = 1; // Points
+    }
+  }
+  
+  updateMovement(player) {
+    // Seulement pour les munitions
+    if (this.type === "ammo" && !this.collected) {
+      let d = this.pos.dist(player.pos);
+      if (d < this.attractionRadius) {
+        // Utiliser arrival pour se déplacer vers le player
+        let arriveForce = this.arrive(player.pos, 50);
+        this.applyForce(arriveForce);
+        this.update();
+      }
     }
   }
 
@@ -37,6 +60,9 @@ class Resource {
             break;
           case "resource":
             player.resourcesCollected++;
+            break;
+          case "ammo":
+            player.addAmmo();
             break;
         }
         
@@ -65,6 +91,23 @@ class Resource {
       fill(255, 255, 255, 150);
       noStroke();
       circle(this.pos.x, this.pos.y, this.r);
+      
+      // Extra effect for ammo
+      if (this.type === "ammo") {
+        // Rotating triangles
+        push();
+        translate(this.pos.x, this.pos.y);
+        rotate(frameCount * 0.05);
+        fill(255, 150, 255, 200);
+        noStroke();
+        for (let i = 0; i < 3; i++) {
+          let angle = (TWO_PI / 3) * i;
+          let x = cos(angle) * this.r * 1.5;
+          let y = sin(angle) * this.r * 1.5;
+          triangle(x, y, x + 3, y + 5, x - 3, y + 5);
+        }
+        pop();
+      }
       
       pop();
     }

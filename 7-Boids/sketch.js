@@ -54,7 +54,11 @@ function setup() {
   for (let i = 0; i < 80; i++) {
     let x = random(-worldSize/2, worldSize/2);
     let y = random(-worldSize/2, worldSize/2);
-    let type = random() < 0.7 ? "resource" : "medkit";
+    let rand = random();
+    let type;
+    if (rand < 0.5) type = "resource";
+    else if (rand < 0.7) type = "medkit";
+    else type = "ammo"; // 30% de munitions
     resources.push(new Resource(x, y, type));
   }
 
@@ -165,8 +169,9 @@ function draw() {
       }
     }
 
-    // Check resource collection
+    // Update and check resource collection
     for (let resource of resources) {
+      resource.updateMovement(player);
       resource.checkCollision(player);
     }
 
@@ -310,6 +315,35 @@ function drawUI() {
   fill(255, 200, 50);
   noStroke();
   text(`Resources: ${player.resourcesCollected}`, 20, 75);
+  
+  // Ammo counter with progress bar
+  fill(255, 100, 255);
+  text(`Ammo: ${player.ammoCount}/7`, 20, 95);
+  
+  // Ammo progress bar
+  fill(100, 0, 100);
+  rect(20, 115, 100, 8);
+  fill(255, 100, 255);
+  rect(20, 115, (player.ammoCount / 7) * 100, 8);
+  stroke(255);
+  strokeWeight(1);
+  noFill();
+  rect(20, 115, 100, 8);
+  
+  // Power-up indicator
+  if (player.ammoPowerUpActive) {
+    fill(255, 50, 255);
+    noStroke();
+    textSize(20);
+    let timeLeft = ceil(player.ammoPowerUpDuration / 60);
+    text(`🔥 POWER-UP! ${timeLeft}s`, 20, 135);
+    textSize(16);
+    
+    // Effet de lueur pulsante
+    let pulse = sin(frameCount * 0.2) * 50 + 205;
+    fill(255, pulse, 255, 100);
+    rect(15, 130, 180, 30);
+  }
   
   // Zombie count and level (top-right)
   fill(255);
@@ -533,7 +567,11 @@ function restartGame() {
   for (let i = 0; i < 80; i++) {
     let x = random(-worldSize/2, worldSize/2);
     let y = random(-worldSize/2, worldSize/2);
-    let type = random() < 0.7 ? "resource" : "medkit";
+    let rand = random();
+    let type;
+    if (rand < 0.5) type = "resource";
+    else if (rand < 0.7) type = "medkit";
+    else type = "ammo"; // 30% de munitions
     resources.push(new Resource(x, y, type));
   }
   

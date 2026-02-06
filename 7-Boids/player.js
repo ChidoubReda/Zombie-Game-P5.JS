@@ -34,6 +34,26 @@ class Player extends Vehicle {
     this.shootCooldown = 0;
     this.shootCooldownMax = 20; // 20 frames = ~0.33 secondes entre chaque tir
     this.shootDistance = 25; // Distance depuis les côtés du player
+    
+    // Système de power-up munitions
+    this.ammoCount = 0; // Nombre de munitions collectées
+    this.ammoPowerUpActive = false;
+    this.ammoPowerUpDuration = 0;
+    this.ammoPowerUpMaxDuration = 420; // 7 secondes à 60fps
+    this.ammoRequiredForPowerUp = 7;
+  }
+  
+  addAmmo() {
+    this.ammoCount++;
+    console.log("💥 Munition collectée! Total:", this.ammoCount);
+    
+    // Activer le power-up si on a 7 munitions
+    if (this.ammoCount >= this.ammoRequiredForPowerUp) {
+      this.ammoPowerUpActive = true;
+      this.ammoPowerUpDuration = this.ammoPowerUpMaxDuration;
+      this.ammoCount = 0; // Reset counter
+      console.log("🔥🔥🔥 POWER-UP ACTIVÉ! Missiles décuplés pendant 7 secondes!");
+    }
   }
 
   handleInput() {
@@ -83,44 +103,59 @@ class Player extends Vehicle {
     if (this.shootCooldown <= 0 && zombies.length > 0) {
       let missiles = [];
       
-      // Trouver le zombie le plus proche
-      let closestZombie = null;
-      let minDist = Infinity;
-      for (let zombie of zombies) {
-        if (!zombie.dead) {
-          let d = this.pos.dist(zombie.pos);
-          if (d < minDist) {
-            minDist = d;
-            closestZombie = zombie;
-          }
-        }
-      }
+      // Récupérer tous les zombies vivants
+      let aliveZombies = zombies.filter(z => !z.dead);
+      if (aliveZombies.length === 0) return [];
       
-      if (closestZombie) {
-        // Calculer les positions des deux côtés du player (perpendiculaire à la direction)
-        let angle = this.vel.mag() > 0.5 ? this.vel.heading() : 0;
+      // Trier les zombies par distance (plus proches en premier)
+      aliveZombies.sort((a, b) => {
+        let distA = this.pos.dist(a.pos);
+        let distB = this.pos.dist(b.pos);
+        return distA - distB;
+      });
+      
+      let angle = this.vel.mag() > 0.5 ? this.vel.heading() : 0;
+      
+      // Nombre de missiles à tirer (2 normalement, 5 avec power-up)
+      let missileCount = this.ammoPowerUpActive ? 5 : 2;
+      
+      if (this.ammoPowerUpActive) {
+        // Tir en cercle complet autour du joueur
+        for (let i = 0; i < missileCount; i++) {
+          let spreadAngle = (TWO_PI / missileCount) * i;
+          let missilePos = createVector(
+            this.pos.x + cos(spreadAngle) * this.shootDistance,
+            this.pos.y + sin(spreadAngle) * this.shootDistance
+          );
+          // Assigner un zombie différent à chaque missile (cycler si plus de missiles que de zombies)
+          let targetZombie = aliveZombies[i % aliveZombies.length];
+          missiles.push(new Missile(missilePos.x, missilePos.y, targetZombie));
+        }
+      } else {
+        // Tir normal des deux côtés
         let perpAngle1 = angle + HALF_PI;
         let perpAngle2 = angle - HALF_PI;
         
-        // Position du missile 1 (côté gauche)
         let missilePos1 = createVector(
           this.pos.x + cos(perpAngle1) * this.shootDistance,
           this.pos.y + sin(perpAngle1) * this.shootDistance
         );
         
-        // Position du missile 2 (côté droit)
         let missilePos2 = createVector(
           this.pos.x + cos(perpAngle2) * this.shootDistance,
           this.pos.y + sin(perpAngle2) * this.shootDistance
         );
         
-        // Créer les deux missiles
-        missiles.push(new Missile(missilePos1.x, missilePos1.y, closestZombie));
-        missiles.push(new Missile(missilePos2.x, missilePos2.y, closestZombie));
+        // Assigner le zombie le plus proche au premier missile
+        missiles.push(new Missile(missilePos1.x, missilePos1.y, aliveZombies[0]));
         
-        // Réinitialiser le cooldown
-        this.shootCooldown = this.shootCooldownMax;
+        // Assigner le deuxième zombie le plus proche (ou le même si un seul zombie)
+        let secondTarget = aliveZombies.length > 1 ? aliveZombies[1] : aliveZombies[0];
+        missiles.push(new Missile(missilePos2.x, missilePos2.y, secondTarget));
       }
+      
+      // Réinitialiser le cooldown
+      this.shootCooldown = this.shootCooldownMax;
       
       return missiles;
     }
@@ -184,6 +219,15 @@ class Player extends Vehicle {
     // Update shoot cooldown
     if (this.shootCooldown > 0) {
       this.shootCooldown--;
+    }
+    
+    // Update ammo power-up
+    if (this.ammoPowerUpActive) {
+      this.ammoPowerUpDuration--;
+      if (this.ammoPowerUpDuration <= 0) {
+        this.ammoPowerUpActive = false;
+        console.log("⚠️ Power-up terminé!");
+      }
     }
     
     // Update flashlight duration
