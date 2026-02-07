@@ -19,6 +19,18 @@ let safeZonesActivated = 0;
 let totalSafeZones = 3;
 let currentLevel = 1; // Niveau actuel du jeu
 let zombiesKilled = 0; // Nombre de zombies tués
+let explosions = []; // Effets d'explosion visuels
+let lastBossSpawn = 0; // Dernier spawn de boss
+let bossSpawnInterval = 1800; // 30 secondes
+
+// Particle system
+let particleSystem;
+
+// Screen effects
+let screenShake = { x: 0, y: 0, intensity: 0, duration: 0 };
+let chromaticAberration = 0; // Intensité de l'effet chromatique
+let slowMotionActive = false;
+let normalFrameRate = 60;
 
 // World bounds (infinite scrolling world)
 let worldSize = 4000;
@@ -29,7 +41,10 @@ let zombieSpawnInterval = 1800; // 30 seconds at 60fps
 
 function setup() {
   createCanvas(windowWidth, windowHeight);
-  frameRate(60);
+  frameRate(normalFrameRate);
+
+  // Initialize particle system
+  particleSystem = new ParticleSystem();
 
   // Initialize player at world center
   player = new Player(0, 0);
@@ -43,11 +58,16 @@ function setup() {
     obstacles.push(new Obstacle(x, y, r, color(60, 60, 70)));
   }
 
-  // Generate initial zombies
+  // Generate initial zombies with varied types
   for (let i = 0; i < 15; i++) {
     let x = random(-500, 500);
     let y = random(-500, 500);
-    zombies.push(new Zombie(x, y, currentLevel)); // Avec le niveau actuel
+    let rand = random();
+    let type = "normal";
+    if (rand < 0.3) type = "fast";
+    else if (rand < 0.5) type = "tank";
+    else if (rand < 0.6) type = "explosive";
+    zombies.push(new Zombie(x, y, currentLevel, type));
   }
 
   // Generate resources scattered in world
@@ -86,10 +106,37 @@ function draw() {
       zombie.update();
     }
     
-    // Supprimer les zombies morts
+    // Supprimer les zombies morts et gérer les effets
     zombies = zombies.filter(z => {
       if (z.dead) {
         zombiesKilled++;
+        
+        // Créer particules de sang selon le type
+        let particleColor;
+        switch(z.type) {
+          case "fast": particleColor = color(100, 200, 100); break;
+          case "tank": particleColor = color(80, 80, 120); break;
+          case "explosive": particleColor = color(255, 150, 50); break;
+          case "boss": particleColor = color(200, 100, 200); break;
+          default: particleColor = color(100, 150, 100);
+        }
+        let particleCount = z.type === "boss" ? 50 : (z.type === "tank" ? 30 : 20);
+        particleSystem.createBloodSplatter(z.pos.x, z.pos.y, particleColor, particleCount);
+        
+        // Gérer l'effet de mort (explosion, etc.)
+        let deathEffect = z.onDeath(player, zombies);
+        if (deathEffect && deathEffect.explosion) {
+          explosions.push({
+            pos: deathEffect.pos,
+            radius: deathEffect.radius,
+            frame: frameCount,
+            maxFrames: 30
+          });
+          // Screen shake pour explosion
+          screenShake.intensity = 15;
+          screenShake.duration = 20;
+        }
+        
         return false;
       }
       return true;
@@ -147,6 +194,10 @@ function draw() {
           player.takeDamage(damage);
           zombie.lastDamageFrame = frameCount;
           
+          // Screen shake quand on prend des dégâts
+          screenShake.intensity = 5 + damage;
+          screenShake.duration = 10;
+          
           // Debug: afficher les dégâts
           if (frameCount % 60 === 0) {
             console.log(`💀 Zombie dégâts: ${damage.toFixed(2)} (x${damageMultiplier.toFixed(2)} après ${secondsOfContact.toFixed(1)}s)`);
@@ -187,6 +238,47 @@ function draw() {
       spawnZombie();
       lastZombieSpawn = frameCount;
     }
+    
+    // Spawn boss periodically
+    if (frameCount - lastBossSpawn > bossSpawnInterval && currentLevel >= 2) {
+      spawnBoss();
+      lastBossSpawn = frameCount;
+    }
+    
+    // Update explosions
+    for (let i = explosions.length - 1; i >= 0; i--) {
+      if (frameCount - explosions[i].frame > explosions[i].maxFrames) {
+        explosions.splice(i, 1);
+      }
+    }
+    
+    // Update particle system
+    particleSystem.update();
+    
+    // Update screen shake
+    if (screenShake.duration > 0) {
+      screenShake.x = random(-screenShake.intensity, screenShake.intensity);
+      screenShake.y = random(-screenShake.intensity, screenShake.intensity);
+      screenShake.duration--;
+      screenShake.intensity *= 0.9; // Décroissance
+    } else {
+      screenShake.x = 0;
+      screenShake.y = 0;
+      screenShake.intensity = 0;
+    }
+    
+    // Update chromatic aberration based on health
+    chromaticAberration = map(player.health, 0, player.maxHealth, 8, 0);
+    chromaticAberration = constrain(chromaticAberration, 0, 8);
+    
+    // Slow motion when low health
+    if (player.health < player.maxHealth * 0.3 && !slowMotionActive) {
+      slowMotionActive = true;
+      frameRate(30); // Ralentir à 30 fps
+    } else if (player.health >= player.maxHealth * 0.3 && slowMotionActive) {
+      slowMotionActive = false;
+      frameRate(normalFrameRate);
+    }
 
     // Check win/lose conditions
     checkGameState();
@@ -213,9 +305,9 @@ function renderGame() {
   // Background
   background(26, 31, 30); // Dark apocalyptic color
 
-  // Apply camera transform (world space)
+  // Apply camera transform (world space) with screen shake
   push();
-  translate(-cameraPos.x + width/2, -cameraPos.y + height/2);
+  translate(-cameraPos.x + width/2 + screenShake.x, -cameraPos.y + height/2 + screenShake.y);
 
   // Draw hexagonal grid background
   drawHexagonalGrid();
@@ -254,11 +346,70 @@ function renderGame() {
       missile.show();
     }
   }
+  
+  // Draw explosions
+  for (let explosion of explosions) {
+    let progress = (frameCount - explosion.frame) / explosion.maxFrames;
+    let currentRadius = explosion.radius * (1 + progress * 2);
+    let alpha = 255 * (1 - progress);
+    
+    // Cercle extérieur
+    noFill();
+    stroke(255, 150, 0, alpha);
+    strokeWeight(4);
+    circle(explosion.pos.x, explosion.pos.y, currentRadius * 2);
+    
+    // Cercle intérieur
+    fill(255, 100, 0, alpha * 0.5);
+    noStroke();
+    circle(explosion.pos.x, explosion.pos.y, currentRadius);
+  }
+  
+  // Draw particles
+  particleSystem.show();
 
   // Draw player
   player.show();
 
   pop(); // End world space
+  
+  // Chromatic aberration effect when hurt
+  if (chromaticAberration > 0.5) {
+    drawChromaticAberration();
+  }
+}
+
+// Effet d'aberration chromatique
+function drawChromaticAberration() {
+  loadPixels();
+  let offset = Math.floor(chromaticAberration);
+  
+  // Copier les pixels actuels
+  let tempPixels = [...pixels];
+  
+  // Appliquer le décalage RGB
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      let index = (x + y * width) * 4;
+      
+      // Rouge décalé à gauche
+      let redIndex = ((x - offset) + y * width) * 4;
+      if (redIndex >= 0 && redIndex < tempPixels.length) {
+        pixels[index] = tempPixels[redIndex];
+      }
+      
+      // Vert reste en place
+      pixels[index + 1] = tempPixels[index + 1];
+      
+      // Bleu décalé à droite
+      let blueIndex = ((x + offset) + y * width) * 4;
+      if (blueIndex >= 0 && blueIndex < tempPixels.length) {
+        pixels[index + 2] = tempPixels[blueIndex + 2];
+      }
+    }
+  }
+  
+  updatePixels();
 }
 
 function drawHexagonalGrid() {
@@ -343,6 +494,17 @@ function drawUI() {
     let pulse = sin(frameCount * 0.2) * 50 + 205;
     fill(255, pulse, 255, 100);
     rect(15, 130, 180, 30);
+  }
+  
+  // Slow motion indicator
+  if (slowMotionActive) {
+    fill(255, 100, 100);
+    noStroke();
+    textSize(18);
+    textAlign(CENTER, TOP);
+    text("⏱️ SLOW MOTION", width/2, 20);
+    textAlign(LEFT, TOP);
+    textSize(16);
   }
   
   // Zombie count and level (top-right)
@@ -468,7 +630,7 @@ function drawGameOver() {
     textSize(24);
     fill(255);
     text(`Resources Collected: ${player.resourcesCollected}`, width/2, height/2 + 20);
-    text(`Zombies Defeated: ${zombiesKilled}`, width/2, height/2 + 80);
+    text(`Zombies Defeated: ${zombiesKilled}`, width/2, height/2 + 50);
   } else {
     textSize(48);
     fill(255, 50, 50);
@@ -477,8 +639,7 @@ function drawGameOver() {
     textSize(24);
     fill(255);
     text(`Resources Collected: ${player.resourcesCollected}`, width/2, height/2 + 20);
-    text(`Zombies Defeated: ${zombiesKilled}: ${player.resourcesCollected}`, width/2, height/2 + 20);
-    text(`Zombies Defeated: 0`, width/2, height/2 + 50);
+    text(`Zombies Defeated: ${zombiesKilled}`, width/2, height/2 + 50);
   }
   
   textSize(18);
@@ -507,7 +668,27 @@ function spawnZombie() {
   let spawnX = player.pos.x + cos(angle) * spawnDist;
   let spawnY = player.pos.y + sin(angle) * spawnDist;
   
-  zombies.push(new Zombie(spawnX, spawnY, currentLevel)); // Avec le niveau actuel
+  // Déterminer le type de zombie (probabilités)
+  let rand = random();
+  let type = "normal";
+  
+  if (rand < 0.3) type = "fast"; // 30%
+  else if (rand < 0.5) type = "tank"; // 20%
+  else if (rand < 0.65) type = "explosive"; // 15%
+  // 35% restant = normal
+  
+  zombies.push(new Zombie(spawnX, spawnY, currentLevel, type));
+}
+
+function spawnBoss() {
+  // Spawn boss loin du joueur
+  let angle = random(TWO_PI);
+  let spawnDist = 800;
+  let spawnX = player.pos.x + cos(angle) * spawnDist;
+  let spawnY = player.pos.y + sin(angle) * spawnDist;
+  
+  zombies.push(new Zombie(spawnX, spawnY, currentLevel, "boss"));
+  console.log("🔴 BOSS ZOMBIE SPAWNED!");
 }
 
 function isOnScreen(worldPos, radius = 0) {
@@ -551,17 +732,29 @@ function restartGame() {
   missiles = [];
   resources = [];
   safeZones = [];
+  explosions = [];
+  particleSystem.clear();
+  screenShake = { x: 0, y: 0, intensity: 0, duration: 0 };
+  chromaticAberration = 0;
+  slowMotionActive = false;
+  frameRate(normalFrameRate);
   gameState = "playing";
   safeZonesActivated = 0;
   lastZombieSpawn = 0;
+  lastBossSpawn = 0;
   currentLevel = 1;
   zombiesKilled = 0;
   
-  // Regenerate world
+  // Regenerate world with varied zombie types
   for (let i = 0; i < 15; i++) {
     let x = random(-500, 500);
     let y = random(-500, 500);
-    zombies.push(new Zombie(x, y, currentLevel));
+    let rand = random();
+    let type = "normal";
+    if (rand < 0.3) type = "fast";
+    else if (rand < 0.5) type = "tank";
+    else if (rand < 0.6) type = "explosive";
+    zombies.push(new Zombie(x, y, currentLevel, type));
   }
   
   for (let i = 0; i < 80; i++) {

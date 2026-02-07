@@ -2,41 +2,83 @@
 // Hérite de Vehicle pour réutiliser les comportements de steering
 
 class Zombie extends Vehicle {
-  constructor(x, y, level = 1) {
+  constructor(x, y, level = 1, type = "normal") {
     super(x, y);
     
-    // Override vehicle properties
+    this.type = type; // "normal", "fast", "tank", "explosive", "boss"
+    this.level = level;
+    
+    // Propriétés par défaut
     this.vel = p5.Vector.random2D();
     this.vel.setMag(random(1, 2));
     this.maxForce = 0.2;
-    this.maxSpeed = 4; // Slower than player
+    this.maxSpeed = 4;
     this.r = 12;
+    this.maxHealth = level;
+    this.damageRate = 1;
+    this.explosionRadius = 0;
+    this.color = color(74, 97, 86); // Vert grisâtre
+    
+    // Configurer selon le type
+    switch(type) {
+      case "fast":
+        this.maxSpeed = 6; // Plus rapide que le joueur
+        this.maxHealth = Math.max(1, Math.floor(level * 0.5)); // Moins de PV
+        this.r = 10; // Plus petit
+        this.color = color(100, 150, 100); // Vert clair
+        this.damageRate = 0.8; // Moins de dégâts
+        break;
+        
+      case "tank":
+        this.maxSpeed = 2; // Très lent
+        this.maxHealth = level * 3; // Beaucoup de PV
+        this.r = 18; // Plus gros
+        this.color = color(60, 60, 80); // Bleu-gris foncé
+        this.damageRate = 1.5; // Plus de dégâts
+        this.maxForce = 0.3;
+        break;
+        
+      case "explosive":
+        this.maxSpeed = 3.5;
+        this.maxHealth = Math.max(1, Math.floor(level * 0.7));
+        this.r = 11;
+        this.color = color(150, 100, 50); // Orange
+        this.explosionRadius = 100; // Rayon d'explosion
+        this.damageRate = 0.7;
+        break;
+        
+      case "boss":
+        this.maxSpeed = 3;
+        this.maxHealth = level * 10; // Beaucoup de PV
+        this.r = 30; // Très gros
+        this.color = color(150, 50, 150); // Violet
+        this.damageRate = 2; // Dégâts importants
+        this.maxForce = 0.4;
+        this.detectionRadius = 300; // Voit de très loin
+        break;
+    }
+    
+    this.health = this.maxHealth;
+    this.dead = false;
 
     // Perception ranges
     this.perceptionRadius = 80;
-    this.detectionRadius = 200; // How far zombie can detect player
+    this.detectionRadius = this.type === "boss" ? 300 : 200;
 
     // Behavior weights
     this.alignWeight = 1.0;
     this.cohesionWeight = 1.2;
     this.separationWeight = 1.5;
-    this.pursueWeight = 3.0; // Strong when chasing
+    this.pursueWeight = 3.0;
     this.avoidWeight = 2.5;
     this.wanderWeight = 0.5;
 
     // Chase mode
     this.isChasing = false;
     
-    // Système de points de vie basé sur le niveau
-    this.level = level;
-    this.maxHealth = level; // Niveau 1 = 1 PV, Niveau 2 = 2 PV, etc.
-    this.health = this.maxHealth;
-    this.dead = false;
-    
     // Système de dégâts progressifs
-    this.contactTime = 0; // Temps de contact avec le joueur
-    this.damageRate = 1; // Dégâts de base par seconde
-    this.lastDamageFrame = 0; // Frame du dernier dégât infligé
+    this.contactTime = 0;
+    this.lastDamageFrame = 0;
   }
 
   // Main behavior function - called every frame
@@ -88,16 +130,63 @@ class Zombie extends Vehicle {
       this.dead = true;
     }
   }
+  
+  // Méthode appelée quand le zombie meurt (pour effets spéciaux)
+  onDeath(player, zombies) {
+    if (this.type === "explosive") {
+      // Explosion qui blesse le joueur et les autres zombies
+      let distToPlayer = this.pos.dist(player.pos);
+      if (distToPlayer < this.explosionRadius) {
+        let damage = map(distToPlayer, 0, this.explosionRadius, 5, 1);
+        player.takeDamage(damage);
+      }
+      
+      // Blesser les zombies proches
+      for (let zombie of zombies) {
+        if (!zombie.dead && zombie !== this) {
+          let distToZombie = this.pos.dist(zombie.pos);
+          if (distToZombie < this.explosionRadius) {
+            let damage = map(distToZombie, 0, this.explosionRadius, 3, 1);
+            zombie.takeDamage(damage);
+          }
+        }
+      }
+      
+      return { explosion: true, radius: this.explosionRadius, pos: this.pos.copy() };
+    }
+    return null;
+  }
 
   // Override show method from Vehicle
   show() {
     push();
 
-    // Body color - grayish green
-    let zombieColor = this.isChasing ? color(150, 50, 50) : color(74, 97, 86);
+    // Body color selon le type
+    let zombieColor = this.isChasing ? 
+      color(red(this.color) + 50, green(this.color), blue(this.color)) : 
+      this.color;
+    
+    // Effet spécial pour explosifs (pulsation)
+    if (this.type === "explosive") {
+      let pulse = sin(frameCount * 0.1) * 30 + 225;
+      fill(pulse, 100, 50, 150);
+      noStroke();
+      circle(this.pos.x, this.pos.y, this.r * 3);
+    }
+    
+    // Effet spécial pour boss (aura)
+    if (this.type === "boss") {
+      for (let i = 3; i > 0; i--) {
+        let alpha = map(i, 0, 3, 0, 50);
+        fill(150, 50, 150, alpha);
+        noStroke();
+        circle(this.pos.x, this.pos.y, this.r * 2 * (1 + i * 0.2));
+      }
+    }
+    
     fill(zombieColor);
     stroke(100);
-    strokeWeight(2);
+    strokeWeight(this.type === "tank" ? 3 : 2);
     circle(this.pos.x, this.pos.y, this.r * 2);
 
     // Red eyes
