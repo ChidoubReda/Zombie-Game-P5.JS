@@ -94,13 +94,15 @@ class Zombie extends Vehicle {
       pursueForce.mult(this.pursueWeight);
       this.applyForce(pursueForce);
 
-      // Use inherited separation
-      let separationForce = this.separation(zombies);
+      // Use inherited separation (limité aux zombies proches pour performance)
+      let nearbyZombies = zombies.filter(z => z !== this && this.pos.dist(z.pos) < this.perceptionRadius * 2);
+      let separationForce = this.separation(nearbyZombies);
       separationForce.mult(this.separationWeight);
       this.applyForce(separationForce);
 
-      // Use inherited avoid
-      let avoidForce = this.avoid(obstacles);
+      // Use inherited avoid (limité aux obstacles proches)
+      let nearbyObstacles = obstacles.filter(o => this.pos.dist(o.pos) < 150);
+      let avoidForce = this.avoid(nearbyObstacles);
       avoidForce.mult(this.avoidWeight);
       this.applyForce(avoidForce);
 
@@ -108,16 +110,18 @@ class Zombie extends Vehicle {
       // IDLE MODE - Flock and wander
       this.isChasing = false;
 
-      // Use inherited flock method (calls align, cohesion, separation)
-      this.flock(zombies, this.alignWeight, this.cohesionWeight, this.separationWeight);
+      // Use inherited flock method (calls align, cohesion, separation) - optimisé
+      let nearbyZombies = zombies.filter(z => z !== this && this.pos.dist(z.pos) < this.perceptionRadius * 2);
+      this.flock(nearbyZombies, this.alignWeight, this.cohesionWeight, this.separationWeight);
 
       // Use inherited wander
       let wanderForce = this.wander();
       wanderForce.mult(this.wanderWeight);
       this.applyForce(wanderForce);
 
-      // Light obstacle avoidance even when idle
-      let avoidForce = this.avoid(obstacles);
+      // Light obstacle avoidance even when idle (limité aux proches)
+      let nearbyObstacles = obstacles.filter(o => this.pos.dist(o.pos) < 150);
+      let avoidForce = this.avoid(nearbyObstacles);
       avoidForce.mult(this.avoidWeight * 0.5);
       this.applyForce(avoidForce);
     }
@@ -141,15 +145,16 @@ class Zombie extends Vehicle {
         player.takeDamage(damage);
       }
       
+      // Limiter le nombre de zombies affectés pour éviter les bugs (max 20)
+      let nearbyZombies = zombies.filter(z => 
+        !z.dead && z !== this && this.pos.dist(z.pos) < this.explosionRadius
+      ).slice(0, 20);
+      
       // Blesser les zombies proches
-      for (let zombie of zombies) {
-        if (!zombie.dead && zombie !== this) {
-          let distToZombie = this.pos.dist(zombie.pos);
-          if (distToZombie < this.explosionRadius) {
-            let damage = map(distToZombie, 0, this.explosionRadius, 3, 1);
-            zombie.takeDamage(damage);
-          }
-        }
+      for (let zombie of nearbyZombies) {
+        let distToZombie = this.pos.dist(zombie.pos);
+        let damage = map(distToZombie, 0, this.explosionRadius, 3, 1);
+        zombie.takeDamage(damage);
       }
       
       return { explosion: true, radius: this.explosionRadius, pos: this.pos.copy() };

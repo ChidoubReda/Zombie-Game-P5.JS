@@ -37,11 +37,19 @@ class Particle {
 class ParticleSystem {
   constructor() {
     this.particles = [];
+    this.maxParticles = 300; // Limite globale pour éviter lag
   }
   
   createBloodSplatter(x, y, particleColor, count = 20) {
+    // Limiter le nombre de particules si on approche de la limite
+    if (this.particles.length > this.maxParticles - count) {
+      count = Math.max(5, Math.floor(count / 2)); // Réduire si trop de particules
+    }
+    
     for (let i = 0; i < count; i++) {
-      this.particles.push(new Particle(x, y, particleColor));
+      if (this.particles.length < this.maxParticles) {
+        this.particles.push(new Particle(x, y, particleColor));
+      }
     }
   }
   
