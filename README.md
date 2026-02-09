@@ -1,12 +1,21 @@
 # 🎮 Zombie Swarm Survival - Projet IA & Steering Behaviors
 
+---
+
+## 📜 Licence
+
+Projet académique - Université Côte d'Azur  
+© 2025-2026 MOUNIB Ghita & CHIDOUB Reda
+
+---
+
 ## 👥 Équipe de Développement
 
 **Étudiants** :
 - **MOUNIB Ghita**
 - **CHIDOUB Reda**
 
-**Formation** : M2 IA2 CASA - Groupe 2  
+**Formation** : M2 IA2 CASA - Groupe 1
 **Année** : 2025-2026  
 **Établissement** : Université Côte d'Azur
 
@@ -503,14 +512,7 @@ pendant que vous modifiez ce même tableau avec splice(). Solutions:
 - **Reynolds, C. W.** (1999). *Steering Behaviors For Autonomous Characters*. GDC 1999
 - **Shiffman, D.** (2012). *The Nature of Code*. Chapter 6: Autonomous Agents
 
----
 
-## 📜 Licence
-
-Projet académique - Université Côte d'Azur  
-© 2025-2026 MOUNIB Ghita & CHIDOUB Reda
-
----
 
 **Pour les détails techniques complets, consultez [rules.md](7-Boids/rules.md)**
  
